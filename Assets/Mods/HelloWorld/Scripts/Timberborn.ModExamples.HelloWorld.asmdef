@@ -1,5 +1,26 @@
 {
   "name": "Timberborn.ModExamples.HelloWorld",
+  "rootNamespace": "Mods.HelloWorld.Scripts",
+  "references": [
+    "Timberborn.CoreUI",
+    "Timberborn.SingletonSystem",
+    "Timberborn.UILayoutSystem",
+    "Unity.TextMeshPro",
+    "UnityEngine.UI",
+    "Timberborn.ModManagement",
+    "Timberborn.ModManagerScene",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [
+    "Bindito.Core.dll",
+    "Timberborn.ModdingTools.dll"
+  ],
   "autoReferenced": false,
-  "allowUnsafeCode": true
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
 }
