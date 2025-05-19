@@ -1,0 +1,227 @@
+---
+description: How timberborn works
+globs: 
+alwaysApply: false
+---
+Timberborn Modding: Mechanics & Architecture Overview
+
+A reference guide for engineers diving into Timberborn mod development—covering core game systems, data models, and modding pipeline.
+
+Table of Contents
+
+Introduction to Timberborn
+
+Game Architecture & Assemblies
+
+World & Block System
+
+Water Simulation
+
+Input & UI Components
+
+Official Modding Pipeline
+
+Community APIs & Tools
+
+AssetBundles & Blueprints
+
+Debugging & Logging
+
+Summary & Next Steps
+
+1. Introduction to Timberborn
+
+Timberborn is a city-building game built in Unity, centered on managing beaver colonies. Its systems are tile-based, deterministic, and written in C#. Mods hook into these systems at runtime or compile-time to extend or alter behavior.
+
+Key takeaways:
+
+Tile grid: All world data (terrain, water, structures) operates on square tiles (TileCoord).
+
+Deterministic updates: Simulation runs in discrete ticks—water, blocks, entities update in a fixed order.
+
+Data-driven: Many rules (blueprints, recipes) are defined in JSON and overridden by mods.
+
+2. Game Architecture & Assemblies
+
+Unity Project & DLLs
+
+Assembly-CSharp.dll: Core game code (namespaces Timberborn.*).
+
+Timberborn.ModdingTools.dll: Official mod entry points (IModStarter, ModBuilder).
+
+Assemblies live in Timberborn/<version>/Timberborn_Data/Managed. Mods build separate DLLs loaded at startup.
+
+Key Namespaces
+
+Timberborn.World — world grid, block management
+
+Timberborn.Water — fluid simulation
+
+Timberborn.DataStructures — TileCoord, utility collections
+
+Timberborn.UI — UI windows, popups, tooltips
+
+Timberborn.Input — block selection, camera controls
+
+3. World & Block System
+
+TileCoord
+
+public struct TileCoord {
+  public int X, Y;
+  public static readonly (int x, int y)[] Adjacent4;
+  public static readonly (int x, int y)[] Adjacent8;
+}
+
+Represents grid coordinates. Use Adjacent4/8 for neighbor iteration.
+
+WorldBlockManager
+
+public class WorldBlockManager {
+  public static WorldBlockManager Instance { get; }
+  public BlockData GetBlock(TileCoord coord);
+  public void SetBlock(TileCoord coord, BlockType type);
+  public void RemoveBlock(TileCoord coord);
+}
+
+BlockData includes .Type (enum), .Health, and other metadata.
+
+BlockType enum
+
+Dirt, Water, Log, Building, etc. Used for logic branching.
+
+4. Water Simulation
+
+WaterFlowManager
+
+public class WaterFlowManager {
+  public static WaterFlowManager Instance { get; }
+  public void UpdateAllFlows();          // called each tick
+  public float GetFlowRate(TileCoord);
+  public float GetDepth(TileCoord);
+}
+
+UpdateAllFlows loops through all water tiles, calling UpdateFlow(coord) internally.
+
+FlowRate: unitless measure of velocity/volume passing tile per tick.
+
+Depth: static volume in tile.
+
+Simulation order
+
+Terrain updates (blocks placed/removed)
+
+Water flow
+
+Entities & constructions
+
+Rendering/UI
+
+Mods typically patch WaterFlowManager.UpdateFlow(TileCoord) for per-tile logic.
+
+5. Input & UI Components
+
+BlockSelectionTool
+
+Located in Timberborn.Input.
+
+Method OnBlockClick(TileCoord coord) invoked when player clicks a tile.
+
+Patch via Harmony to intercept before/after clicks.
+
+UIPopupManager
+
+public class UIPopupManager {
+  public static UIPopupManager Instance { get; }
+  public void ShowMessage(string text);
+  public void ShowTemporaryLabel(TileCoord coord, string text);
+}
+
+Use for quick feedback (like showing erosion values).
+
+6. Official Modding Pipeline
+
+Mod Builder & Assembly Importer
+
+Clone mechanistry/timberborn-modding repo.
+
+Import in Unity; select Timberborn install to pull DLLs.
+
+Create a mod under Assets/Mods/YourModName.
+
+Write an IModStarter class to register patches or load assets.
+
+Use Unity’s Timberborn → Show Mod Builder window to compile and package.
+
+IModStarter Interface
+
+public interface IModStarter {
+  void StartMod(IModEnvironment env);
+}
+
+env.Logger.Info/Debug/Error for logs.
+
+env.ModDirectory points to mod folder for loading asset bundles.
+
+7. Community APIs & Tools
+
+TimberAPI (Thunderstore)
+
+Dependency injection via [OnInit], [AfterPaint] attributes.
+
+UI builders, JSON spec overrides, localization, event hooks.
+
+Harmony Patching
+
+Patch types: Prefix, Postfix, Transpiler—injects IL before/after/or transforms method bodies.
+
+Usage:
+
+var harmony = new Harmony("com.mod.id");
+harmony.Patch(
+  AccessTools.Method(typeof(TargetClass), "MethodName"),
+  prefix: new HarmonyMethod(typeof(MyPatch), nameof(Prefix)),
+  postfix: new HarmonyMethod(typeof(MyPatch), nameof(Postfix))
+);
+
+8. AssetBundles & Blueprints
+
+AssetBundles
+
+Store custom textures, models, UI prefabs.
+
+Build in Unity and load at runtime from env.ModDirectory:
+
+var bundle = AssetBundle.LoadFromFile(Path.Combine(env.ModDirectory, "mybundle"));
+var prefab = bundle.LoadAsset<GameObject>("MyPrefab");
+
+Blueprints (JSON Overrides)
+
+Located in Blueprints/ folder in mod directory.
+
+Define new or override existing block/recipe specs.
+
+Game auto-loads any *.json blueprint in Mods/<ModID>/Blueprints/.
+
+9. Debugging & Logging
+
+env.Logger: write to Timberborn/Logs/Mods.log.
+
+Unity Debug: use Debug.DrawLine or Gizmos for world visualization (in-editor).
+
+Attach VS: in Unity Editor, enable Script Debugging, then attach Visual Studio to debug Harmony patches.
+
+10. Summary & Next Steps
+
+This overview covers the core classes, systems, and tools you’ll interact with when modding Timberborn. Next:
+
+Set up the modding repo and verify you can build & load a “Hello World” mod.
+
+Experiment with Harmony patches (e.g., log flow rates).
+
+Extend into custom mechanics (erosion, UI enhancements).
+
+Leverage TimberAPI for cleaner code and JSON overrides for data-driven tweaks.
+
+
+Happy building—and may your beavers thrive under your code!
