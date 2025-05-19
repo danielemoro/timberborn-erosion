@@ -30,6 +30,7 @@ This guide provides a comprehensive overview of modding for Timberborn, covering
     *   [The In-Game Mod Manager](#the-in-game-mod-manager)
 7.  [Debugging and Logging](#7-debugging-and-logging)
 8.  [Community Resources](#8-community-resources)
+9.  [Case Study: Extending the Hello World Mod](#9-case-study-extending-the-hello-world-mod)
 
 ## 1. Introduction to Timberborn Modding
 
@@ -432,4 +433,167 @@ In Unity (with the Timberborn Modding Project setup):
 *   **Timberborn Wiki**: ([https://timberborn.wiki.gg/wiki/Creating_Mods](https://timberborn.wiki.gg/wiki/Creating_Mods))
 *   **GitHub `mechanistry/timberborn-modding`**: Official examples and tools.
 
-This guide provides a foundation. Experiment with the example mods and engage with the community to deepen your understanding. Happy modding! 
+## 9. Case Study: Extending the Hello World Mod
+
+This section details practical lessons learned while extending the basic Hello World mod to add keyboard input handling and dynamic UI updates.
+
+### Key Challenges and Solutions
+
+#### 1. Input System in Timberborn
+
+Timberborn uses Unity's new Input System package instead of the legacy Input class. Attempts to use the old system will result in runtime errors:
+
+```
+InvalidOperationException: You are trying to read Input using the UnityEngine.Input class, but you have switched active Input handling to Input System package in Player Settings.
+```
+
+**Solution**: Import the `UnityEngine.InputSystem` namespace and use the new API:
+
+```csharp
+// Add reference to Unity.InputSystem in your .asmdef file
+
+// Old approach (will fail)
+if (Input.GetKeyDown(KeyCode.R)) { /* ... */ }
+
+// New approach
+private Keyboard _keyboard;
+
+private void Awake() {
+    _keyboard = Keyboard.current;
+}
+
+private void Update() {
+    // Ensure keyboard is available
+    if (_keyboard == null) {
+        _keyboard = Keyboard.current;
+        if (_keyboard == null) return;
+    }
+    
+    if (_keyboard.rKey.wasPressedThisFrame) {
+        // Handle key press
+    }
+}
+```
+
+#### 2. Dependency Injection and Lifecycle
+
+Timberborn uses Bindito.Core for dependency injection. To properly integrate with the game:
+
+1. Create a Configurator class annotated with `[Context("Game")]`
+2. Implement lifecycle interfaces like `ILoadableSingleton` and `IUpdatableSingleton` for initialization and update calls
+3. Use constructor injection to get required services
+
+**Example**:
+```csharp
+[Context("Game")]
+public class MyModConfigurator : IConfigurator {
+    public void Configure(IContainerDefinition containerDefinition) {
+        containerDefinition.Bind<MyModService>().AsSingleton();
+    }
+}
+
+public class MyModService : ILoadableSingleton, IUpdatableSingleton {
+    // Constructor injection
+    public MyModService(UILayout uiLayout, VisualElementLoader visualElementLoader) {
+        // Store dependencies
+    }
+    
+    // Called after instantiation
+    public void Load() {
+        // Initialize your mod
+    }
+    
+    // Called every frame
+    public void UpdateSingleton() {
+        // Handle updates
+    }
+}
+```
+
+#### 3. UI Management
+
+Timberborn uses Unity's UIElements system for its UI. To create and update UI elements:
+
+1. Use the `VisualElementLoader` to load UI templates defined in XML (UXML)
+2. Create elements procedurally with proper styling
+3. Add elements to the layout with `UILayout.AddBottomRight()` or similar methods
+
+**Example for dynamic UI updates**:
+```csharp
+private readonly UILayout _uiLayout;
+private readonly VisualElementLoader _visualElementLoader;
+private VisualElement _rootElement;
+private Label _infoLabel;
+
+public void Load() {
+    // Load template
+    _rootElement = _visualElementLoader.LoadVisualElement("HelloWorld");
+    
+    // Create new element
+    _infoLabel = new Label("Initial text");
+    
+    // Style the element
+    _infoLabel.style.color = new StyleColor(new Color(1f, 1f, 0.8f));
+    _infoLabel.style.fontSize = 14;
+    _infoLabel.style.paddingTop = 5;
+    // ... other styling ...
+    
+    // Add to UI tree and layout
+    _rootElement.Add(_infoLabel);
+    _uiLayout.AddBottomRight(_rootElement, 0);
+}
+
+// Later, to update:
+_infoLabel.text = "Updated text";
+_infoLabel.style.backgroundColor = new StyleColor(new Color(0.8f, 0.2f, 0.2f, 0.9f));
+```
+
+#### 4. Assembly Definition (.asmdef) Structure
+
+A properly configured .asmdef file is crucial for mod development:
+
+```json
+{
+  "name": "YourMod.Name",
+  "rootNamespace": "YourMod.Namespace",
+  "references": [
+    "Timberborn.CoreUI",
+    "Timberborn.SingletonSystem",
+    "Timberborn.UILayoutSystem",
+    "Unity.InputSystem",
+    // Other necessary references
+  ],
+  "precompiledReferences": [
+    "Bindito.Core.dll",
+    "Timberborn.ModdingTools.dll"
+  ],
+  "autoReferenced": false
+}
+```
+
+Key points:
+- `autoReferenced: false` prevents namespace collisions
+- Include Unity.InputSystem for input handling
+- Include Timberborn namespaces for services you need
+- List Bindito.Core.dll in precompiledReferences
+
+#### 5. Debugging and Logging
+
+For effective debugging:
+
+- Use `Debug.Log()` with clear prefixes for filtering: `[YourMod] Message`
+- Create a simple helper logger class for consistent formatting
+- When troubleshooting UI, verify that configurator and load methods are being called
+- Use multiple approaches simultaneously when troubleshooting input issues
+
+### Summary of Best Practices
+
+1. **Follow Timberborn's architecture**: Use its lifecycle interfaces, dependency injection, and UI system.
+2. **Use the correct input system**: Always use the new Unity Input System package.
+3. **Keep direct references**: Store references to UI elements you'll need to update later.
+4. **Add proper debugging**: Use appropriate logging to diagnose issues.
+5. **Build incrementally**: Start with minimal functionality and add features progressively.
+6. **Understand the UI hierarchy**: Elements must be properly added to the visual tree.
+7. **Use simple approaches first**: A direct text update is more reliable than complex nested UI.
+
+The Hello World mod is an excellent starting point for understanding how Timberborn's modding system works. Build on this foundation by carefully following the patterns established in the examples. Happy modding! 
